@@ -1,0 +1,498 @@
+{
+	"info": {
+		"_postman_id": "4541cae9-3ad0-44a9-8a32-449e69a27fd3",
+		"name": "brksec_2027",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "1a. collect intel from TG",
+			"event": [
+				{
+					"listen": "prerequest",
+					"script": {
+						"id": "2999f64c-c91a-42c1-b74d-dde46178d32c",
+						"exec": [
+							"var d = new Date();",
+							"d.setHours(d.getHours() - 2);",
+							"postman.setEnvironmentVariable('past_hour', d.toISOString());"
+						],
+						"type": "text/javascript"
+					}
+				},
+				{
+					"listen": "test",
+					"script": {
+						"id": "166373b2-001c-402c-b0fe-672c6276639a",
+						"exec": [
+							"var jsonData = JSON.parse(responseBody);",
+							"var sha_list=[];",
+							"var sample_list = [];",
+							"",
+							"for (var a in jsonData['data']['items']){",
+							"        sha_list.push(jsonData['data']['items'][a]['item']['sha256']);",
+							"        sample_list.push(jsonData['data']['items'][a]['item']['sample'])",
+							"    }",
+							"",
+							"pm.environment.set('sha_list', sha_list);",
+							"pm.environment.set('sample_list', sample_list);"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "https://panacea.threatgrid.com/api/v2/search/submissions?api_key={{tg_key}}&after={{past_hour}}&term=behavior&q={{tg_behavior_search}}",
+					"protocol": "https",
+					"host": [
+						"panacea",
+						"threatgrid",
+						"com"
+					],
+					"path": [
+						"api",
+						"v2",
+						"search",
+						"submissions"
+					],
+					"query": [
+						{
+							"key": "api_key",
+							"value": "{{tg_key}}"
+						},
+						{
+							"key": "after",
+							"value": "{{past_hour}}"
+						},
+						{
+							"key": "term",
+							"value": "behavior"
+						},
+						{
+							"key": "q",
+							"value": "{{tg_behavior_search}}"
+						}
+					]
+				},
+				"description": "this request will return a list of all samples that match a specific behavioral critera."
+			},
+			"response": []
+		},
+		{
+			"name": "1b. collect all domain data for samples",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"id": "1c808ee6-0db8-4a14-9bba-0d4a8ea5e4ec",
+						"exec": [
+							"var jsonData = JSON.parse(responseBody);",
+							"var domain_list = [];",
+							"for (var a in jsonData['data']['items']){",
+							"    domain_list.push(jsonData['data']['items'][a]['domain'])",
+							"}",
+							"",
+							"var filteredArray = domain_list.filter(function(item, pos){",
+							"  return domain_list.indexOf(item)== pos; ",
+							"});",
+							"",
+							"pm.environment.set(\"domain_list\", filteredArray);",
+							""
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "https://panacea.threatgrid.com/api/v2/samples/feeds/domains?api_key={{tg_key}}&sample={{sample_list}}",
+					"protocol": "https",
+					"host": [
+						"panacea",
+						"threatgrid",
+						"com"
+					],
+					"path": [
+						"api",
+						"v2",
+						"samples",
+						"feeds",
+						"domains"
+					],
+					"query": [
+						{
+							"key": "api_key",
+							"value": "{{tg_key}}"
+						},
+						{
+							"key": "sample",
+							"value": "{{sample_list}}"
+						}
+					]
+				},
+				"description": "based on intel we are interested in get more data about malware samples"
+			},
+			"response": []
+		},
+		{
+			"name": "1c. collect co-occuring domains with Umbrella",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"id": "31ec99a0-a9b8-44ed-a7d5-3fa4a60cc54d",
+						"exec": [
+							"var jsonData = JSON.parse(responseBody);",
+							"var co_occuring = [];",
+							"",
+							"for (var a in jsonData['pfs2']){",
+							"    co_occuring.push(jsonData['pfs2'][a][0])",
+							"}",
+							"",
+							"",
+							"pm.environment.set(\"co_occuring\", co_occuring)"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Bearer {{investigate_token}}",
+						"type": "text"
+					},
+					{
+						"key": "Content-Type",
+						"value": "application/json",
+						"type": "text"
+					}
+				],
+				"url": {
+					"raw": "https://investigate.api.umbrella.com/recommendations/name/mine.ppxxmr.com.json",
+					"protocol": "https",
+					"host": [
+						"investigate",
+						"api",
+						"umbrella",
+						"com"
+					],
+					"path": [
+						"recommendations",
+						"name",
+						"mine.ppxxmr.com.json"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "1d. collect related domains with Umbrella",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"id": "31ec99a0-a9b8-44ed-a7d5-3fa4a60cc54d",
+						"exec": [
+							"var jsonData = JSON.parse(responseBody);",
+							"var related_domains = [];",
+							"",
+							"for (var a in jsonData['tb1']){",
+							"    related_domains.push(jsonData['tb1'][a][0])",
+							"}",
+							"",
+							"",
+							"pm.environment.set(\"related_domains\", related_domains)"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "Authorization",
+						"type": "text",
+						"value": "Bearer {{investigate_token}}"
+					},
+					{
+						"key": "Content-Type",
+						"type": "text",
+						"value": "application/json"
+					}
+				],
+				"url": {
+					"raw": "https://investigate.api.umbrella.com/links/name/mine.ppxxmr.com.json",
+					"protocol": "https",
+					"host": [
+						"investigate",
+						"api",
+						"umbrella",
+						"com"
+					],
+					"path": [
+						"links",
+						"name",
+						"mine.ppxxmr.com.json"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "1e. check list for clean domains with Umbrella",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"id": "31ec99a0-a9b8-44ed-a7d5-3fa4a60cc54d",
+						"exec": [
+							""
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Authorization",
+						"type": "text",
+						"value": "Bearer {{investigate_token}}"
+					},
+					{
+						"key": "Content-Type",
+						"type": "text",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "[\"mine.ppxxmr.com\",\"pastebin.com\",\"api.ipify.org\",\"redlan.hopto.org\",\"nandos.hopto.org\"]"
+				},
+				"url": {
+					"raw": "https://investigate.api.umbrella.com/domains/categorization/",
+					"protocol": "https",
+					"host": [
+						"investigate",
+						"api",
+						"umbrella",
+						"com"
+					],
+					"path": [
+						"domains",
+						"categorization",
+						""
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "2a. find domain sightings in CTR",
+			"request": {
+				"auth": {
+					"type": "oauth2",
+					"oauth2": [
+						{
+							"key": "accessToken",
+							"value": "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJodHRwczpcL1wvc2NoZW1hcy5jaXNjby5jb21cL2lyb2hcL2lkZW50aXR5XC9jbGFpbXNcL3VzZXJcL2VtYWlsIjoibmVpcGF0ZWwrZGVtb0BjaXNjby5jb20iLCJodHRwczpcL1wvc2NoZW1hcy5jaXNjby5jb21cL2lyb2hcL2lkZW50aXR5XC9jbGFpbXNcL3VzZXJcL3Njb3BlcyI6WyJpbnRlZ3JhdGlvbiIsInByaXZhdGUtaW50ZWwiLCJhZG1pbiIsInByb2ZpbGUiLCJpbnNwZWN0Iiwic3NlIiwidXNlcnMiLCJjYXNlYm9vayIsImVucmljaCIsIm9hdXRoIiwiY29sbGVjdCIsInJlc3BvbnNlIiwidWktc2V0dGluZ3MiLCJnbG9iYWwtaW50ZWw6cmVhZCJdLCJodHRwczpcL1wvc2NoZW1hcy5jaXNjby5jb21cL2lyb2hcL2lkZW50aXR5XC9jbGFpbXNcL3VzZXJcL25pY2siOiJOZWlsIFBhdGVsIiwiZW1haWwiOiJuZWlwYXRlbCtkZW1vQGNpc2NvLmNvbSIsInN1YiI6IjBjNzI4NDBhLTZhMjgtNDA1Yy04Y2FlLTVjNzJjOGZlZmMxMCIsImlzcyI6IklST0ggQXV0aCIsImh0dHBzOlwvXC9zY2hlbWFzLmNpc2NvLmNvbVwvaXJvaFwvaWRlbnRpdHlcL2NsYWltc1wvc2NvcGVzIjpbImVucmljaDpyZWFkIiwiY2FzZWJvb2siLCJpbnNwZWN0OnJlYWQiXSwiZXhwIjoxNTU5ODUwOTU1LCJodHRwczpcL1wvc2NoZW1hcy5jaXNjby5jb21cL2lyb2hcL2lkZW50aXR5XC9jbGFpbXNcL29hdXRoXC91c2VyXC9pZCI6IjBjNzI4NDBhLTZhMjgtNDA1Yy04Y2FlLTVjNzJjOGZlZmMxMCIsImh0dHBzOlwvXC9zY2hlbWFzLmNpc2NvLmNvbVwvaXJvaFwvaWRlbnRpdHlcL2NsYWltc1wvb3JnXC9pZCI6ImMyY2RlMmM0LTM2YjgtNDYwZi05MzA4LTJkYjg1MjU3ZDFlMiIsImh0dHBzOlwvXC9zY2hlbWFzLmNpc2NvLmNvbVwvaXJvaFwvaWRlbnRpdHlcL2NsYWltc1wvb2F1dGhcL2dyYW50IjoiY2xpZW50LWNyZWRzIiwianRpIjoiYWRmZDBiZGMtYTY5MC00ZDZiLWIxOWEtMzhhMzA1YTdiOThkIiwibmJmIjoxNTU5ODUwMjk1LCJodHRwczpcL1wvc2NoZW1hcy5jaXNjby5jb21cL2lyb2hcL2lkZW50aXR5XC9jbGFpbXNcL29hdXRoXC9zY29wZXMiOlsiZW5yaWNoOnJlYWQiLCJjYXNlYm9vayIsImluc3BlY3Q6cmVhZCJdLCJodHRwczpcL1wvc2NoZW1hcy5jaXNjby5jb21cL2lyb2hcL2lkZW50aXR5XC9jbGFpbXNcL3VzZXJcL25hbWUiOiJOZWlsIFBhdGVsIiwiaHR0cHM6XC9cL3NjaGVtYXMuY2lzY28uY29tXC9pcm9oXC9pZGVudGl0eVwvY2xhaW1zXC91c2VyXC9pZCI6IjBjNzI4NDBhLTZhMjgtNDA1Yy04Y2FlLTVjNzJjOGZlZmMxMCIsImh0dHBzOlwvXC9zY2hlbWFzLmNpc2NvLmNvbVwvaXJvaFwvaWRlbnRpdHlcL2NsYWltc1wvb2F1dGhcL2NsaWVudFwvaWQiOiJjbGllbnQtYTM5NGNmYzYtNDFiYS00MzlmLTlhMzktMDc0MjVkYWMwMzVmIiwiaHR0cHM6XC9cL3NjaGVtYXMuY2lzY28uY29tXC9pcm9oXC9pZGVudGl0eVwvY2xhaW1zXC92ZXJzaW9uIjoidjEuMjAuMC03ZjBhMzUzMTYzZmY5MjVmYjM4MyIsImlhdCI6MTU1OTg1MDM1NSwiaHR0cHM6XC9cL3NjaGVtYXMuY2lzY28uY29tXC9pcm9oXC9pZGVudGl0eVwvY2xhaW1zXC9vYXV0aFwva2luZCI6ImFjY2Vzcy10b2tlbiJ9.LPRQBNtVMiOl9ukTW4qykzMyTDBBmqHcjrlW-fJhPTclsvic_c9tIiFuQlfIcke7T6RZ36ZdiOxtx-hHj3X3JyBvxTLlOW8pkHM0sV6K3NTF2_HcqnKNWmmc-1cdL6Cgjl9X8clP7frpC2vdcw7cw_J08z47gxsN6aVNEFBcdzd1XS9cpQFL9PNWuk0F4ZZU1vTR9RQFIBgOjPyDMQnzFgUmlg2HDFeicUlGKFWgQmireaI5ZYxPBd-mngiBNOVW5sc8gprx3aV0FINKqbA55wDTXtZ4b_CiqK0mBHRy0aCvAd_GbH2VVRUasopeYJCKO-I7B0VjxIbHqLXznu-ZTQ",
+							"type": "string"
+						},
+						{
+							"key": "tokenType",
+							"value": "bearer",
+							"type": "string"
+						},
+						{
+							"key": "addTokenTo",
+							"value": "header",
+							"type": "string"
+						}
+					]
+				},
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"name": "Content-Type",
+						"value": "application/json",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "[{\"value\":\"retdemos.com\",\"type\":\"domain\"}]"
+				},
+				"url": {
+					"raw": "https://visibility.amp.cisco.com/iroh/iroh-enrich/observe/observables",
+					"protocol": "https",
+					"host": [
+						"visibility",
+						"amp",
+						"cisco",
+						"com"
+					],
+					"path": [
+						"iroh",
+						"iroh-enrich",
+						"observe",
+						"observables"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "2b. find sha sightings in CTR",
+			"request": {
+				"auth": {
+					"type": "oauth2",
+					"oauth2": [
+						{
+							"key": "accessToken",
+							"value": "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJodHRwczpcL1wvc2NoZW1hcy5jaXNjby5jb21cL2lyb2hcL2lkZW50aXR5XC9jbGFpbXNcL3VzZXJcL2VtYWlsIjoibmVpcGF0ZWwrZGVtb0BjaXNjby5jb20iLCJodHRwczpcL1wvc2NoZW1hcy5jaXNjby5jb21cL2lyb2hcL2lkZW50aXR5XC9jbGFpbXNcL3VzZXJcL3Njb3BlcyI6WyJpbnRlZ3JhdGlvbiIsInByaXZhdGUtaW50ZWwiLCJhZG1pbiIsInByb2ZpbGUiLCJpbnNwZWN0Iiwic3NlIiwidXNlcnMiLCJjYXNlYm9vayIsImVucmljaCIsIm9hdXRoIiwiY29sbGVjdCIsInJlc3BvbnNlIiwidWktc2V0dGluZ3MiLCJnbG9iYWwtaW50ZWw6cmVhZCJdLCJodHRwczpcL1wvc2NoZW1hcy5jaXNjby5jb21cL2lyb2hcL2lkZW50aXR5XC9jbGFpbXNcL3VzZXJcL25pY2siOiJOZWlsIFBhdGVsIiwiZW1haWwiOiJuZWlwYXRlbCtkZW1vQGNpc2NvLmNvbSIsInN1YiI6IjBjNzI4NDBhLTZhMjgtNDA1Yy04Y2FlLTVjNzJjOGZlZmMxMCIsImlzcyI6IklST0ggQXV0aCIsImh0dHBzOlwvXC9zY2hlbWFzLmNpc2NvLmNvbVwvaXJvaFwvaWRlbnRpdHlcL2NsYWltc1wvc2NvcGVzIjpbImVucmljaDpyZWFkIiwiY2FzZWJvb2siLCJpbnNwZWN0OnJlYWQiXSwiZXhwIjoxNTU5ODUwOTU1LCJodHRwczpcL1wvc2NoZW1hcy5jaXNjby5jb21cL2lyb2hcL2lkZW50aXR5XC9jbGFpbXNcL29hdXRoXC91c2VyXC9pZCI6IjBjNzI4NDBhLTZhMjgtNDA1Yy04Y2FlLTVjNzJjOGZlZmMxMCIsImh0dHBzOlwvXC9zY2hlbWFzLmNpc2NvLmNvbVwvaXJvaFwvaWRlbnRpdHlcL2NsYWltc1wvb3JnXC9pZCI6ImMyY2RlMmM0LTM2YjgtNDYwZi05MzA4LTJkYjg1MjU3ZDFlMiIsImh0dHBzOlwvXC9zY2hlbWFzLmNpc2NvLmNvbVwvaXJvaFwvaWRlbnRpdHlcL2NsYWltc1wvb2F1dGhcL2dyYW50IjoiY2xpZW50LWNyZWRzIiwianRpIjoiYWRmZDBiZGMtYTY5MC00ZDZiLWIxOWEtMzhhMzA1YTdiOThkIiwibmJmIjoxNTU5ODUwMjk1LCJodHRwczpcL1wvc2NoZW1hcy5jaXNjby5jb21cL2lyb2hcL2lkZW50aXR5XC9jbGFpbXNcL29hdXRoXC9zY29wZXMiOlsiZW5yaWNoOnJlYWQiLCJjYXNlYm9vayIsImluc3BlY3Q6cmVhZCJdLCJodHRwczpcL1wvc2NoZW1hcy5jaXNjby5jb21cL2lyb2hcL2lkZW50aXR5XC9jbGFpbXNcL3VzZXJcL25hbWUiOiJOZWlsIFBhdGVsIiwiaHR0cHM6XC9cL3NjaGVtYXMuY2lzY28uY29tXC9pcm9oXC9pZGVudGl0eVwvY2xhaW1zXC91c2VyXC9pZCI6IjBjNzI4NDBhLTZhMjgtNDA1Yy04Y2FlLTVjNzJjOGZlZmMxMCIsImh0dHBzOlwvXC9zY2hlbWFzLmNpc2NvLmNvbVwvaXJvaFwvaWRlbnRpdHlcL2NsYWltc1wvb2F1dGhcL2NsaWVudFwvaWQiOiJjbGllbnQtYTM5NGNmYzYtNDFiYS00MzlmLTlhMzktMDc0MjVkYWMwMzVmIiwiaHR0cHM6XC9cL3NjaGVtYXMuY2lzY28uY29tXC9pcm9oXC9pZGVudGl0eVwvY2xhaW1zXC92ZXJzaW9uIjoidjEuMjAuMC03ZjBhMzUzMTYzZmY5MjVmYjM4MyIsImlhdCI6MTU1OTg1MDM1NSwiaHR0cHM6XC9cL3NjaGVtYXMuY2lzY28uY29tXC9pcm9oXC9pZGVudGl0eVwvY2xhaW1zXC9vYXV0aFwva2luZCI6ImFjY2Vzcy10b2tlbiJ9.LPRQBNtVMiOl9ukTW4qykzMyTDBBmqHcjrlW-fJhPTclsvic_c9tIiFuQlfIcke7T6RZ36ZdiOxtx-hHj3X3JyBvxTLlOW8pkHM0sV6K3NTF2_HcqnKNWmmc-1cdL6Cgjl9X8clP7frpC2vdcw7cw_J08z47gxsN6aVNEFBcdzd1XS9cpQFL9PNWuk0F4ZZU1vTR9RQFIBgOjPyDMQnzFgUmlg2HDFeicUlGKFWgQmireaI5ZYxPBd-mngiBNOVW5sc8gprx3aV0FINKqbA55wDTXtZ4b_CiqK0mBHRy0aCvAd_GbH2VVRUasopeYJCKO-I7B0VjxIbHqLXznu-ZTQ",
+							"type": "string"
+						},
+						{
+							"key": "tokenType",
+							"value": "bearer",
+							"type": "string"
+						},
+						{
+							"key": "addTokenTo",
+							"value": "header",
+							"type": "string"
+						}
+					]
+				},
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"name": "Content-Type",
+						"value": "application/json",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "[{\"value\":\"b1380fd95bc5c0729738dcda2696aa0a7c6ee97a93d992931ce717a0df523967\",\"type\":\"sha256\"}]"
+				},
+				"url": {
+					"raw": "https://visibility.amp.cisco.com/iroh/iroh-enrich/observe/observables",
+					"protocol": "https",
+					"host": [
+						"visibility",
+						"amp",
+						"cisco",
+						"com"
+					],
+					"path": [
+						"iroh",
+						"iroh-enrich",
+						"observe",
+						"observables"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "3a. get group of interest from AMP",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"id": "23d0b71a-a864-43cf-beff-382bf75f4aab",
+						"exec": [
+							"var jsonData = JSON.parse(responseBody);",
+							"for (var a in jsonData['data']){",
+							"    if (jsonData['data'][a]['name'] == 'Demo-LAB'){",
+							"        pm.environment.set('amp4e_group_id', jsonData['data'][a]['guid']);",
+							"    }",
+							"}",
+							"",
+							""
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "https://{{amp_client_id}}:{{amp_api_key}}@api.amp.cisco.com/v1/groups",
+					"protocol": "https",
+					"host": [
+						"api",
+						"amp",
+						"cisco",
+						"com"
+					],
+					"auth": {
+						"user": "{{amp_client_id}}",
+						"password": "{{amp_api_key}}"
+					},
+					"path": [
+						"v1",
+						"groups"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "3b. move impacted computer to new group",
+			"request": {
+				"method": "PATCH",
+				"header": [],
+				"body": {
+					"mode": "formdata",
+					"formdata": [
+						{
+							"key": "group_guid",
+							"value": "{{amp4e_group_id}}",
+							"type": "text"
+						},
+						{
+							"key": "active",
+							"value": "false",
+							"type": "text"
+						}
+					]
+				},
+				"url": {
+					"raw": "https://{{amp_client_id}}:{{amp_api_key}}@api.amp.cisco.com/v1/computers/f2829319-7f19-4e9e-9e51-67a531f740b3",
+					"protocol": "https",
+					"host": [
+						"api",
+						"amp",
+						"cisco",
+						"com"
+					],
+					"auth": {
+						"user": "{{amp_client_id}}",
+						"password": "{{amp_api_key}}"
+					},
+					"path": [
+						"v1",
+						"computers",
+						"f2829319-7f19-4e9e-9e51-67a531f740b3"
+					]
+				}
+			},
+			"response": []
+		}
+	]
+}
